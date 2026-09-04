@@ -10,14 +10,13 @@
       box-sizing: border-box;
       user-select: none;
       -webkit-user-select: none;
-      /* スクロールや拡大・引っ張り動作を完全に無効化 */
       touch-action: none;
     }
     html, body {
       width: 100%;
       height: 100%;
-      overflow: hidden; /* 画面スクロールを固定 */
-      overscroll-behavior: none; /* 引っ張りバウンスを防止 */
+      overflow: hidden;
+      overscroll-behavior: none;
     }
     body {
       font-family: 'Hiragino Kaku Gothic ProN', 'メイリオ', sans-serif;
@@ -28,37 +27,68 @@
       align-items: center;
       justify-content: center;
       margin: 0;
-      padding: 15px;
+      padding: 10px;
     }
     h1 {
-      margin: 0 0 15px 0;
-      font-size: clamp(22px, 5vw, 32px);
+      margin: 0 0 10px 0;
+      font-size: clamp(20px, 4.5vw, 28px);
       color: #0056b3;
     }
 
-    /* 時計本体のスタイル */
+    /* 時計本体 */
     #clock-container {
       position: relative;
-      width: min(80vw, 340px);
-      height: min(80vw, 340px);
+      width: min(82vw, 350px);
+      height: min(82vw, 350px);
       background: #ffffff;
-      border: 10px solid #ff9f43;
+      border: 8px solid #ff9f43;
       border-radius: 50%;
       box-shadow: 0 8px 20px rgba(0,0,0,0.15);
       cursor: pointer;
     }
 
-    /* 目盛りと文字盤 */
-    .number {
+    /* 時間の数字 (1〜12) */
+    .hour-number {
       position: absolute;
-      width: 40px;
-      height: 40px;
+      width: 36px;
+      height: 36px;
       text-align: center;
-      line-height: 40px;
-      font-size: clamp(20px, 5vw, 26px);
+      line-height: 36px;
+      font-size: clamp(18px, 4.5vw, 24px);
       font-weight: bold;
       color: #2c3e50;
       transform: translate(-50%, -50%);
+    }
+
+    /* 分の数字 (0, 5, 10...55) */
+    .minute-number {
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      text-align: center;
+      line-height: 24px;
+      font-size: clamp(11px, 2.8vw, 14px);
+      font-weight: bold;
+      color: #2e86de;
+      transform: translate(-50%, -50%);
+    }
+
+    /* 1分刻みの目盛り線 */
+    .tick-mark {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 2px;
+      height: 6px;
+      background-color: #a4b0be;
+      transform-origin: center bottom;
+    }
+
+    /* 5分ごとの太い目盛り線 */
+    .tick-mark.major {
+      width: 3px;
+      height: 10px;
+      background-color: #2e86de;
     }
 
     /* 中心点 */
@@ -82,47 +112,47 @@
       transform-origin: bottom center;
       border-radius: 10px;
       z-index: 5;
-      pointer-events: none; /* 針自体へのドラッグ干渉を防止 */
+      pointer-events: none;
     }
 
-    /* 短針（時針・赤色） */
+    /* 短針（時針・赤） */
     .hour-hand {
       width: 10px;
-      height: 25%;
+      height: 24%;
       background-color: #ff5252;
       transform: translateX(-50%) rotate(0deg);
     }
 
-    /* 長針（分針・青色） */
+    /* 長針（分針・青） */
     .minute-hand {
       width: 6px;
-      height: 38%;
+      height: 37%;
       background-color: #2e86de;
       transform: translateX(-50%) rotate(0deg);
     }
 
     /* デジタル時計表示 */
     .digital-display {
-      margin-top: 15px;
-      font-size: 26px;
+      margin-top: 12px;
+      font-size: 24px;
       font-weight: bold;
       background: #fff;
-      padding: 8px 25px;
+      padding: 6px 20px;
       border-radius: 30px;
       border: 3px solid #0056b3;
-      min-width: 180px;
+      min-width: 170px;
       text-align: center;
       color: #0056b3;
     }
 
     /* 操作ボタンエリア */
     .controls {
-      margin-top: 20px;
+      margin-top: 15px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
       width: 100%;
-      max-width: 340px;
+      max-width: 350px;
     }
 
     .btn-group {
@@ -133,8 +163,8 @@
 
     .btn {
       flex: 1;
-      padding: 12px;
-      font-size: 16px;
+      padding: 10px;
+      font-size: 15px;
       font-weight: bold;
       border: none;
       border-radius: 12px;
@@ -159,7 +189,7 @@
   <h1>とけいの がくしゅう</h1>
 
   <div id="clock-container">
-    <div id="numbers-layer"></div>
+    <div id="dial-layer"></div>
     <div id="hour-hand" class="hand hour-hand"></div>
     <div id="minute-hand" class="hand minute-hand"></div>
     <div class="center-dot"></div>
@@ -189,21 +219,55 @@
     const minuteHand = document.getElementById('minute-hand');
     const digitalText = document.getElementById('digital-text');
 
-    function createNumbers() {
-      const layer = document.getElementById('numbers-layer');
+    // 文字盤（目盛り・時間の数字・分の数字）を配置
+    function createDial() {
+      const layer = document.getElementById('dial-layer');
       layer.innerHTML = '';
-      const radius = clockContainer.clientWidth * 0.38;
-      const centerX = clockContainer.clientWidth / 2;
-      const centerY = clockContainer.clientHeight / 2;
+      
+      const width = clockContainer.clientWidth;
+      const centerX = width / 2;
+      const centerY = width / 2;
 
+      // 1. 60個の分刻み目盛りを生成
+      for (let i = 0; i < 60; i++) {
+        const tick = document.createElement('div');
+        const isMajor = (i % 5 === 0);
+        tick.className = `tick-mark ${isMajor ? 'major' : ''}`;
+        
+        const angle = i * 6; // 1刻み = 6度
+        const radius = width * 0.46; // 外枠近くに配置
+
+        // 角度と位置の設定
+        tick.style.transform = `translate(-50%, -100%) rotate(${angle}deg) translateY(-${radius - 10}px)`;
+        layer.appendChild(tick);
+      }
+
+      // 2. 時間の数字 (1〜12)
+      const hourRadius = width * 0.32;
       for (let i = 1; i <= 12; i++) {
         const num = document.createElement('div');
-        num.className = 'number';
+        num.className = 'hour-number';
         num.textContent = i;
         
         const angle = (i * 30 - 90) * (Math.PI / 180);
-        const x = centerX + radius * Math.cos(angle);
-        const y = centerY + radius * Math.sin(angle);
+        const x = centerX + hourRadius * Math.cos(angle);
+        const y = centerY + hourRadius * Math.sin(angle);
+
+        num.style.left = `${x}px`;
+        num.style.top = `${y}px`;
+        layer.appendChild(num);
+      }
+
+      // 3. 分の数字 (0, 5, 10, 15...55)
+      const minuteRadius = width * 0.41;
+      for (let i = 0; i < 60; i += 5) {
+        const num = document.createElement('div');
+        num.className = 'minute-number';
+        num.textContent = i;
+        
+        const angle = (i * 6 - 90) * (Math.PI / 180);
+        const x = centerX + minuteRadius * Math.cos(angle);
+        const y = centerY + minuteRadius * Math.sin(angle);
 
         num.style.left = `${x}px`;
         num.style.top = `${y}px`;
@@ -267,7 +331,7 @@
 
     function handlePointer(e) {
       if (!isDragging) return;
-      e.preventDefault(); // タッチ操作によるページスクロールを完全防止
+      e.preventDefault();
       stopRealTime();
 
       const rect = clockContainer.getBoundingClientRect();
@@ -293,7 +357,7 @@
 
     clockContainer.addEventListener('pointerdown', (e) => {
       isDragging = true;
-      clockContainer.setPointerCapture(e.pointerId); // ポインターを時計領域に固定
+      clockContainer.setPointerCapture(e.pointerId);
       handlePointer(e);
     });
 
@@ -305,7 +369,7 @@
     });
 
     window.onload = () => {
-      createNumbers();
+      createDial();
       updateClock();
     };
   </script>
