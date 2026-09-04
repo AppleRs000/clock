@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="robots" content="noindex,nofollow">
+  <title>がくしゅう用 とけい</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+    body {
+      font-family: 'Hiragino Kaku Gothic ProN', 'メイリオ', sans-serif;
+      background-color: #f0f8ff;
+      color: #333;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 15px;
+    }
+    h1 {
+      margin: 0 0 15px 0;
+      font-size: clamp(22px, 5vw, 32px);
+      color: #0056b3;
+    }
+
+    /* 時計本体のスタイル */
+    #clock-container {
+      position: relative;
+      width: min(85vw, 360px);
+      height: min(85vw, 360px);
+      background: #ffffff;
+      border: 10px solid #ff9f43;
+      border-radius: 50%;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+      cursor: pointer;
+    }
+
+    /* 目盛りと文字盤 */
+    .number {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      text-align: center;
+      line-height: 40px;
+      font-size: clamp(20px, 5vw, 26px);
+      font-weight: bold;
+      color: #2c3e50;
+      transform: translate(-50%, -50%);
+    }
+
+    /* 中心点 */
+    .center-dot {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 16px;
+      height: 16px;
+      background: #333;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 10;
+    }
+
+    /* 針の共通スタイル */
+    .hand {
+      position: absolute;
+      bottom: 50%;
+      left: 50%;
+      transform-origin: bottom center;
+      border-radius: 10px;
+      z-index: 5;
+    }
+
+    /* 短針（時針・赤色で分かりやすく） */
+    .hour-hand {
+      width: 10px;
+      height: 25%;
+      background-color: #ff5252;
+      transform: translateX(-50%) rotate(0deg);
+    }
+
+    /* 長針（分針・青色で分かりやすく） */
+    .minute-hand {
+      width: 6px;
+      height: 38%;
+      background-color: #2e86de;
+      transform: translateX(-50%) rotate(0deg);
+    }
+
+    /* デジタル時計表示 */
+    .digital-display {
+      margin-top: 15px;
+      font-size: 28px;
+      font-weight: bold;
+      background: #fff;
+      padding: 8px 25px;
+      border-radius: 30px;
+      border: 3px solid #0056b3;
+      min-width: 180px;
+      text-align: center;
+      color: #0056b3;
+    }
+
+    /* 操作ボタンエリア */
+    .controls {
+      margin-top: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+      max-width: 360px;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 12px;
+      font-size: 16px;
+      font-weight: bold;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      box-shadow: 0 4px 0 rgba(0,0,0,0.1);
+      transition: transform 0.1s;
+    }
+
+    .btn:active {
+      transform: translateY(2px);
+      box-shadow: none;
+    }
+
+    .btn-realtime { background-color: #10ac84; color: white; }
+    .btn-toggle { background-color: #54a0ff; color: white; }
+    .btn-step { background-color: #ff9f43; color: white; }
+  </style>
+</head>
+<body>
+
+  <h1>とけいの がくしゅう</h1>
+
+  <div id="clock-container">
+    <div id="numbers-layer"></div>
+    <div id="hour-hand" class="hand hour-hand"></div>
+    <div id="minute-hand" class="hand minute-hand"></div>
+    <div class="center-dot"></div>
+  </div>
+
+  <div id="digital-text" class="digital-display">12じ 00ふん</div>
+
+  <div class="controls">
+    <div class="btn-group">
+      <button class="btn btn-realtime" onclick="setRealTime()">いまの じかん</button>
+      <button class="btn btn-toggle" onclick="toggleDigital()">こたえを かくす</button>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-step" onclick="addMinutes(-15)">- 15ふん</button>
+      <button class="btn btn-step" onclick="addMinutes(15)">+ 15ふん</button>
+    </div>
+  </div>
+
+  <script>
+    let totalMinutes = 720; // 12:00（分単位で状態管理: 0〜719）
+    let isRealTimeMode = false;
+    let realTimeInterval = null;
+    let showDigital = true;
+
+    const clockContainer = document.getElementById('clock-container');
+    const hourHand = document.getElementById('hour-hand');
+    const minuteHand = document.getElementById('minute-hand');
+    const digitalText = document.getElementById('digital-text');
+
+    // 文字盤の数字（1〜12）を動的に生成
+    function createNumbers() {
+      const layer = document.getElementById('numbers-layer');
+      const radius = clockContainer.clientWidth * 0.38;
+      const centerX = clockContainer.clientWidth / 2;
+      const centerY = clockContainer.clientHeight / 2;
+
+      for (let i = 1; i <= 12; i++) {
+        const num = document.createElement('div');
+        num.className = 'number';
+        num.textContent = i;
+        
+        // 角度から位置を計算
+        const angle = (i * 30 - 90) * (Math.PI / 180);
+        const x = centerX + radius * Math.cos(angle);
+        const y = centerY + radius * Math.sin(angle);
+
+        num.style.left = `${x}px`;
+        num.style.top = `${y}px`;
+        layer.appendChild(num);
+      }
+    }
+
+    // 針の角度と文字更新
+    function updateClock() {
+      // 範囲を0〜719分に丸める
+      totalMinutes = (totalMinutes % 720 + 720) % 720;
+
+      const minutes = totalMinutes % 60;
+      const hours = Math.floor(totalMinutes / 60) || 12;
+
+      // 分針: 1分 = 6度
+      const minuteAngle = minutes * 6;
+      // 時針: 1分 = 0.5度（少しずつ滑らかに動く）
+      const hourAngle = (totalMinutes % 720) * 0.5;
+
+      minuteHand.style.transform = `translateX(-50%) rotate(${minuteAngle}deg)`;
+      hourHand.style.transform = `translateX(-50%) rotate(${hourAngle}deg)`;
+
+      // デジタル表示の更新
+      if (showDigital) {
+        digitalText.textContent = `${hours}じ ${String(minutes).padStart(2, '0')}ふん`;
+      } else {
+        digitalText.textContent = `？？じ ？？ふん`;
+      }
+    }
+
+    // 分を加算・減算
+    function addMinutes(mins) {
+      stopRealTime();
+      totalMinutes += mins;
+      updateClock();
+    }
+
+    // 現在時刻に設定
+    function setRealTime() {
+      stopRealTime();
+      isRealTimeMode = true;
+      syncWithCurrentTime();
+      realTimeInterval = setInterval(syncWithCurrentTime, 1000);
+    }
+
+    function syncWithCurrentTime() {
+      const now = new Date();
+      const h = now.getHours() % 12;
+      const m = now.getMinutes();
+      totalMinutes = h * 60 + m;
+      updateClock();
+    }
+
+    function stopRealTime() {
+      isRealTimeMode = false;
+      if (realTimeInterval) clearInterval(realTimeInterval);
+    }
+
+    // こたえの表示・非表示切り替え
+    function toggleDigital() {
+      showDigital = !showDigital;
+      const btn = document.querySelector('.btn-toggle');
+      btn.textContent = showDigital ? 'こたえを かくす' : 'こたえを みせる';
+      updateClock();
+    }
+
+    // マウス・タッチドラッグ操作で針（角度）を回す
+    let isDragging = false;
+
+    function handlePointer(e) {
+      if (!isDragging) return;
+      stopRealTime();
+
+      const rect = clockContainer.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+      // 中心からの角度を計算（0〜360度）
+      let angle = Math.atan2(clientY - centerY, clientX - centerX) * (180 / Math.PI) + 90;
+      if (angle < 0) angle += 360;
+
+      // 角度から分（0〜59）を算出
+      const targetMinute = Math.round(angle / 6) % 60;
+      const currentMinute = totalMinutes % 60;
+
+      // 長針が12を跨いだ時に時間を加減算するロジック
+      let diff = targetMinute - currentMinute;
+      if (diff > 30) diff -= 60;
+      if (diff < -30) diff += 60;
+
+      totalMinutes += diff;
+      updateClock();
+    }
+
+    clockContainer.addEventListener('pointerdown', (e) => {
+      isDragging = true;
+      handlePointer(e);
+    });
+
+    window.addEventListener('pointermove', handlePointer);
+    window.addEventListener('pointerup', () => isDragging = false);
+
+    // 初期化
+    window.onload = () => {
+      createNumbers();
+      updateClock();
+    };
+  </script>
+</body>
+</html>
